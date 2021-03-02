@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from calculations import *
 
+# commit test comment
 
 def Process(path, csv=0):       # Command that is executed to launch the video processing
     start = str(app.main_box.frame['VideoFrame'].start_time.get())  # gets start time from the sliders in video frame
@@ -18,7 +19,7 @@ def Process(path, csv=0):       # Command that is executed to launch the video p
     if csv:         # If this option is activated, it will write the keypoints as a CSV
         command = command + ' --write_csv '
 
-    command = command + ' ' + path  # Adds the path at the end
+    command = command + ' ' + '"' + path + '"'  # Adds the path at the end + quotation marks
     print(command)                  # For test purposes
     subprocess.call(command)
     Switch_to('graphs')
@@ -26,6 +27,7 @@ def Process(path, csv=0):       # Command that is executed to launch the video p
 
 def Switch_to(location):            # makes sure all concerned frames are switched
     if location == 'graphs':
+        app.main_box.frame["GraphsFrame"].FetchGraph(9)
         app.main_box.Switch_frame(frame_class=GraphsFrame)
         app.side.Switch_frame(frame_class=SideGraphMenu)
     elif location == 'video':
