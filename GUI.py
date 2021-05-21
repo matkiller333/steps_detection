@@ -7,8 +7,8 @@ from moviepy.editor import *
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from calculations import *
+from functions import *
 
-# commit test comment
 
 def Process(path, csv=0):       # Command that is executed to launch the video processing
     start = str(app.main_box.frame['VideoFrame'].start_time.get())  # gets start time from the sliders in video frame
@@ -27,7 +27,10 @@ def Process(path, csv=0):       # Command that is executed to launch the video p
 
 def Switch_to(location):            # makes sure all concerned frames are switched
     if location == 'graphs':
-        app.main_box.frame["GraphsFrame"].FetchGraph(9)
+        try:
+            app.main_box.frame["GraphsFrame"].FetchGraph(9)
+        except:  # if no previously generated graphs
+            app.main_box.frame["GraphsFrame"].FetchGraph(-1)
         app.main_box.Switch_frame(frame_class=GraphsFrame)
         app.side.Switch_frame(frame_class=SideGraphMenu)
     elif location == 'video':
@@ -47,6 +50,11 @@ def Load_video(path):
     app.main_box.frame["VideoFrame"].Receiver(frames, max_time)
 
 
+def Load_csv(path, frame_rate, vid_name, start=0, end='max'):
+    keypoints_full, loop_range = Fetch_keypoints(start=start, end=end, rate=frame_rate, name=vid_name, path=path)
+    angles = Angles_over_time(keypoints_full, loop_range, save=1)
+
+
 # Main window containing everything
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -64,23 +72,23 @@ class MainWindow(tk.Tk):
 
 # Display template with the option to change frame
 class Display(tk.Frame):
-    def __init__(self, master, start_class, *args):
+    def __init__(self, master, start_class, *args):  # look into super().__init__
         tk.Frame.__init__(self, master) # The master is the window in which the object (of class display) will be packed
         start_name = str(start_class).split('.')[1].split("'")[0]
         self.frame = {start_name: start_class(self)}  # Declare self.frame as a dict. so you can access the wanted
         self.frame[start_name].grid(row=0, column=0)  # frame depending on the name provided for the switch_frame
                                                       # function
         for i in args:  # Initialises all menus other than start_class
-            name = str(i).split('.')[1].split("'")[0]       # Gets the name of the desired class for the frame
+            name = i.__name__  # Gets the name of the desired class for the frame
             self.frame[name] = i(self)
             self.frame[name].grid(row=0, column=0)
-#        for key, values in self.frame.items():
-#            print('key: ', key, 'value: ', values)
         self.Switch_frame(start_class)
 
     def Switch_frame(self, frame_class):
-        name = str(frame_class).split('.')[1].split("'")[0]
-        self.frame[name].tkraise()
+        name = frame_class.__name__  # gets the name of the frame you want to display
+        # name = str(frame_class).split('.')[1].split("'")[0]  # frame_class is an object with a name of the form:
+        # <class '__main__.SideVideoMenu'>, splits to get the name
+        self.frame[name].tkraise()  # raises it
 
 
 # Frame option for the side menu which contains the options for processing the video/data
@@ -89,15 +97,16 @@ class SideVideoMenu(tk.Frame):
         tk.Frame.__init__(self, master, bg='#3C3F41', width=305, height=720)
         self.grid_propagate(0)
 
+
         # Video path section
         tk.Label(self, bg='#3C3F41', fg='white', text='Enter the video path').grid(row=0, column=0, columnspan=2)
         self.directory = tk.StringVar()
-        self.path = tk.Entry(self, bg='grey', fg='white', width=47, textvariable=self.directory)  # text box
+        self.path = tk.Entry(self, bg='grey', fg='white', width=47, textvariable=self.directory)  # text box for path
         self.path.grid(row=1, column=0, columnspan=2, sticky=tk.W)
         tk.Button(self, bg='grey', fg='white', text='load',
-                  command=lambda: Load_video(self.directory.get())).grid(row=2, column=1)  # load button
-        tk.Button(self, bg='grey', fg='white', text='auto fill',  # auto fill button
-                  command=lambda: self.Set_text('..\\examples\\personal\\video_test2.mp4')).grid(row=2, column=0)
+                  command=lambda: Load_video(self.directory.get())).grid(row=2, column=0, columnspan='2')  # load button
+        # tk.Button(self, bg='grey', fg='white', text='auto fill',  # auto fill button
+        #          command=lambda: self.Set_text('..\\examples\\personal\\video_test2.mp4')).grid(row=2, column=0)
         self.photo = tk.PhotoImage(file='assets\\icons\\folder.png').subsample(50, 50)
         tk.Button(self, image=self.photo, command=lambda: self.Open_file()).grid(row=1, column=2, sticky=tk.SE)
 
@@ -105,12 +114,22 @@ class SideVideoMenu(tk.Frame):
         ttk.Separator(self, orient=tk.HORIZONTAL).grid(row=3, column=0, columnspan=3, sticky=tk.EW)
         self.csv = tk.IntVar()
         tk.Checkbutton(self, bg='grey', fg='white', text='Write CSV', variable=self.csv).grid(row=4, sticky=tk.EW)
-        tk.Radiobutton(self, )
+
+        # CSV path section, to get graphs with already processed videos
+        ttk.Separator(self, orient=tk.HORIZONTAL).grid(row=5, column=0, columnspan=3, sticky=tk.EW)
+        self.csvdir = tk.StringVar()  # var to hold csv file path
+        self.framerate = tk.IntVar()  # var to hold frame rate of csv file
+        self.csv_path = tk.Entry(self, bg='grey', fg='white', width=47, textvariable=self.csvdir)  # text box for path
+        self.csv_path.grid(row=6, column=0, columnspan='2', sticky=tk.EW)
+        self.framebox = tk.Entry(self, bg='grey', fg='white', width=47, textvariable=self.csvdir)  # text box for frame rate
+        self.framebox.grid(row=7, column=0, columnspan='2')
+        tk.Button(self, bg='grey', fg='white', text='load',
+                  command=lambda: Load_csv(self.csv_path, self.framerate)).grid(row=8, column=0)
 
         # process button
         self.process_but = tk.Button(self, bg='grey', fg='white', text='process', state=tk.DISABLED,
                                      command=lambda: Process(self.directory.get(), self.csv.get()))
-        self.process_but.grid(row=5, column=0, columnspan=2)
+        self.process_but.grid(row=10, column=0, columnspan=2)
 
     def Set_text(self, text):
         self.directory.set(text)
@@ -190,13 +209,18 @@ class GraphsFrame(tk.Frame):
         tk.Frame.__init__(self, master, bg='grey', relief='ridge', width=1040, height=720)
         self.grid_propagate(0)  # ensures the Frame does not let its slaves define its size
         self.asset = 0
-        self.FetchGraph(9)
+        try:
+            self.FetchGraph(9)
+        except:
+            self.FetchGraph(-1)
         self.graph = tk.Label(self, image=self.asset)  # anchors the graph a first time
         self.graph.image = self.asset  # uses the anchor to display the graph (don't ask why it works) REQUIRED
         self.graph.grid(row=2)
 
     def FetchGraph(self, choice):  # Gets the graph from matplotlib in output directory
-        if choice == 9:
+        if choice == -1:
+            self.asset = tk.PhotoImage(file='assets\\icons\\placeholder.png')
+        elif choice == 9:
             self.asset = tk.PhotoImage(file='output\\matplotlib\\temp_graph.png')
         else:
             name = 'output\\matplotlib\\temp_graph_'+str(choice)+'.png'
